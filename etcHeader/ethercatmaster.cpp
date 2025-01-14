@@ -1,5 +1,11 @@
 #include "ethercatmaster.h"
 
+
+#include <QProcess>
+#include <QString>
+#include <QDebug>
+
+
 struct Test {
     char a;
     int b;
@@ -147,6 +153,17 @@ EtherCatMaster::EtherCatMaster()
 
 
 }
+void executeCommand(QString cmdstr) {
+    QProcess process;
+    process.start(cmdstr); // 执行 Linux 命令
+    process.waitForFinished(); // 等待命令执行完成
+    QString output = process.readAllStandardOutput(); // 获取标准输出
+    QString error = process.readAllStandardError();   // 获取错误输出
+
+    qDebug() << "Command :" << output;
+    qDebug() << "Command :" << error;
+}
+
 void *EtherCatMaster::etcinit(void)
 {
     std::stringstream path;
@@ -156,6 +173,8 @@ void *EtherCatMaster::etcinit(void)
     //qDebug() << QString::fromStdString(path.str()) << "lsfd-"<< i << "="<< lsfd[i];
     if (ETCfd < 0){
         ::close(ETCfd);
+
+
         return nullptr;
     }
     void *etcmem;
@@ -171,13 +190,18 @@ void *EtherCatMaster::etcinit0(void)
 {
     std::stringstream path;
     //path << "/dev/shm/vm_shared/shared_memory";
-     path << "/mnt/ramdisk/etc_read";
+    path << "/mnt/ramdisk/etc_read";
     ::close(ETCfd);
     ETCfd = open(path.str().c_str(), O_RDWR);
     //qDebug() << QString::fromStdString(path.str()) << "lsfd-"<< i << "="<< lsfd[i];
     if (ETCfd < 0){
         ::close(ETCfd);
-        return nullptr;
+        executeCommand("sudo dd if=/dev/zero of=/dev/shm/etc_read bs=1M count=10");
+        ETCfd = open("/dev/shm/etc_read", O_RDWR);
+        if(ETCfd < 0){
+            return nullptr;
+        }
+
     }
     void *etcmem;
     etcmem = static_cast<void *>(mmap(NULL,ETC_SHM_SIZE,PROT_READ|PROT_WRITE,MAP_SHARED,ETCfd,0));
@@ -198,7 +222,12 @@ void *EtherCatMaster::etcinitwrite(void)
     //qDebug() << QString::fromStdString(path.str()) << "lsfd-"<< i << "="<< lsfd[i];
     if (ETCWritefd < 0){
         ::close(ETCWritefd);
-        return nullptr;
+        executeCommand("sudo dd if=/dev/zero of=/dev/shm/etc_write bs=1M count=10");
+        ETCWritefd = open("/dev/shm/etc_write", O_RDWR);
+        if(ETCWritefd < 0){
+            return nullptr;
+        }
+
     }
     void *etcmem;
     //etcmem = static_cast<void *>(mmap(NULL,ETC_SHM_SIZE,PROT_READ|PROT_WRITE,MAP_SHARED,ETCWritefd,0));
